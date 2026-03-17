@@ -4,6 +4,9 @@ namespace App\Services;
 
 use App\Models\Account;
 use App\Models\Cdr;
+use DomainException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class CallSimulationService
 {
@@ -13,12 +16,21 @@ class CallSimulationService
 
     /**
      * Start a new call for the given account.
+     * Validates account status and balance before creating CDR.
      */
     public function startCall(Account $account): Cdr
     {
+        if ($account->status !== 'active') {
+            throw new DomainException("Account {$account->id} is not active");
+        }
+
+        if ($account->balance <= 0) {
+            throw new DomainException("Account {$account->id} has insufficient balance");
+        }
+
         return Cdr::create([
             'account_id' => $account->id,
-            'uniqueid' => uniqid('sim-', true),
+            'uniqueid' => 'sim-' . Str::ulid(),
             'src' => $account->number,
             'dst' => $this->generateDestination(),
             'started_at' => now(),
@@ -39,26 +51,30 @@ class CallSimulationService
     }
 
     /**
-     * End call: calculate cost, charge account, update CDR.
+     * End call atomically: lock account, calculate cost, update CDR, charge balance.
+     * All operations within a single transaction to prevent partial writes.
      */
     public function endCall(Cdr $cdr): Cdr
     {
-        $account = $cdr->account;
-        $tariff = $account->tariff;
+        return DB::transaction(function () use ($cdr) {
+            $account = Account::lockForUpdate()->find($cdr->account_id);
+            $tariff = $account->tariff;
 
-        $billsec = max(0, $cdr->duration - $tariff->free_seconds);
-        $cost = $this->billing->calculateCost($tariff, $cdr->duration);
+            $billsec = $this->billing->calculateBillsec($tariff, $cdr->duration);
+            $cost = $this->billing->calculateCost($tariff, $cdr->duration);
 
-        $cdr->update([
-            'ended_at' => now(),
-            'billsec' => $billsec,
-            'cost' => $cost,
-            'status' => 'completed',
-        ]);
+            $cdr->update([
+                'ended_at' => now(),
+                'billsec' => $billsec,
+                'cost' => $cost,
+                'status' => 'completed',
+            ]);
 
-        $this->billing->chargeAccount($account, $cost);
+            $account->balance -= $cost;
+            $account->save();
 
-        return $cdr->fresh();
+            return $cdr;
+        });
     }
 
     /**
