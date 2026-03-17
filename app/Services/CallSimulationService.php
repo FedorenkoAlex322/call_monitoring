@@ -2,6 +2,10 @@
 
 namespace App\Services;
 
+use App\Events\BalanceUpdated;
+use App\Events\CallEnded;
+use App\Events\CallStarted;
+use App\Events\CallUpdated;
 use App\Models\Account;
 use App\Models\Cdr;
 use DomainException;
@@ -28,7 +32,7 @@ class CallSimulationService
             throw new DomainException("Account {$account->id} has insufficient balance");
         }
 
-        return Cdr::create([
+        $cdr = Cdr::create([
             'account_id' => $account->id,
             'uniqueid' => 'sim-' . Str::ulid(),
             'src' => $account->number,
@@ -38,6 +42,10 @@ class CallSimulationService
             'status' => 'active',
             'disposition' => 'ANSWERED',
         ]);
+
+        event(new CallStarted($cdr));
+
+        return $cdr;
     }
 
     /**
@@ -46,6 +54,8 @@ class CallSimulationService
     public function updateCall(Cdr $cdr, int $elapsedSeconds): Cdr
     {
         $cdr->update(['duration' => $elapsedSeconds]);
+
+        event(new CallUpdated($cdr));
 
         return $cdr;
     }
@@ -72,6 +82,9 @@ class CallSimulationService
 
             $account->balance -= $cost;
             $account->save();
+
+            event(new CallEnded($cdr));
+            event(new BalanceUpdated($account));
 
             return $cdr;
         });
