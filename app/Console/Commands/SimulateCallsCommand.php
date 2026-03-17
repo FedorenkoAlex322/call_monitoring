@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Account;
 use App\Services\CallSimulationService;
+use DomainException;
 use Illuminate\Console\Command;
 
 class SimulateCallsCommand extends Command
@@ -38,7 +39,12 @@ class SimulateCallsCommand extends Command
             $account->load('tariff');
 
             // Start call
-            $cdr = $service->startCall($account);
+            try {
+                $cdr = $service->startCall($account);
+            } catch (DomainException $e) {
+                $this->warn("[SKIPPED] {$account->number}: {$e->getMessage()}");
+                continue;
+            }
             $this->info("[STARTED] {$cdr->src} -> {$cdr->dst} (uniqueid: {$cdr->uniqueid})");
 
             // Duration ticks

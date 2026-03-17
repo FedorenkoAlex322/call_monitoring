@@ -2,40 +2,38 @@
 
 namespace App\Services;
 
-use App\Models\Account;
 use App\Models\Tariff;
-use Illuminate\Support\Facades\DB;
 
 class BillingService
 {
     /**
-     * Calculate call cost based on tariff and duration.
+     * Calculate call cost based on tariff and duration using bcmath for precision.
      */
-    public function calculateCost(Tariff $tariff, int $durationSeconds): float
+    public function calculateCost(Tariff $tariff, int $durationSeconds): string
     {
         $billableSeconds = max(0, $durationSeconds - $tariff->free_seconds);
 
         if ($billableSeconds === 0) {
-            return (float) $tariff->connection_fee;
+            return $tariff->connection_fee;
         }
 
-        $minutes = ceil($billableSeconds / 60);
-        $cost = ($minutes * $tariff->price_per_minute) + $tariff->connection_fee;
+        $minutes = (string) ceil($billableSeconds / 60);
+        $cost = bcadd(
+            bcmul($minutes, $tariff->price_per_minute, 4),
+            $tariff->connection_fee,
+            2
+        );
 
-        return round($cost, 2);
+        return $cost;
     }
 
     /**
-     * Charge account balance within a transaction with row locking.
+     * Calculate billable seconds based on tariff free seconds.
+     * Single source of truth for billsec calculation.
      */
-    public function chargeAccount(Account $account, float $amount): bool
+    public function calculateBillsec(Tariff $tariff, int $durationSeconds): int
     {
-        DB::transaction(function () use ($account, $amount) {
-            $account = Account::lockForUpdate()->find($account->id);
-            $account->balance -= $amount;
-            $account->save();
-        });
-
-        return true;
+        return max(0, $durationSeconds - $tariff->free_seconds);
     }
 }
+
