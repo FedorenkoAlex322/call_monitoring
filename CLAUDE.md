@@ -5,7 +5,7 @@ Laravel 12 application for real-time Asterisk PBX management via Asterisk Realti
 PostgreSQL serves as both the application database and Asterisk Realtime backend.
 
 ## Tech Stack
-- **PHP:** ^8.2 (strict typing required)
+- **PHP:** ^8.2
 - **Laravel:** ^12.0
 - **Database:** PostgreSQL (Asterisk Realtime + application data)
 - **Frontend:** Vite 7 + Tailwind CSS 4 + Blade
@@ -28,7 +28,7 @@ composer test    # Run PHPUnit tests
 - Repositories in `app/Repositories/` for complex queries
 - Actions in `app/Actions/` for single-purpose operations
 - Events/Listeners for async operations and Asterisk event handling
-- Strict typing: `declare(strict_types=1)` in all PHP files
+- Follow standard Laravel code style (no declare(strict_types=1))
 - SOLID, DRY, KISS principles
 
 ## Database
