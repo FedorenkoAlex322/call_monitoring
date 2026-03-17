@@ -1,44 +1,55 @@
-# Project: Realtime Asterisk
+# Project: Realtime Asterisk — Call Monitoring Dashboard
 
 ## Overview
-Laravel 12 application for real-time Asterisk PBX management via Asterisk Realtime Architecture.
-PostgreSQL serves as both the application database and Asterisk Realtime backend.
+Real-time call monitoring and billing dashboard. Simulated VoIP calls
+broadcast via WebSocket to a live dashboard showing active calls,
+balance updates, and CDR history.
 
 ## Tech Stack
-- **PHP:** ^8.2
-- **Laravel:** ^12.0
-- **Database:** PostgreSQL (Asterisk Realtime + application data)
-- **Frontend:** Vite 7 + Tailwind CSS 4 + Blade
-- **Testing:** PHPUnit ^11.5 (Feature + Unit), SQLite in-memory for tests
-- **Queue:** Database driver (planned migration to Redis/RabbitMQ)
-- **Code Style:** Laravel Pint (PSR-12 based)
+- **PHP:** ^8.2, Laravel 12, Sanctum 4
+- **Database:** PostgreSQL 16 (with CHECK constraints for data integrity)
+- **Cache/Queue/Session:** Redis 7
+- **WebSocket:** Soketi (Pusher Protocol v7, Docker: quay.io/soketi/soketi)
+- **Frontend:** Blade + Alpine.js 3 + Laravel Echo + Tailwind CSS 4
+- **Build:** Vite 7
+- **Testing:** PHPUnit 11 (SQLite in-memory)
+- **Infrastructure:** Docker Compose (5 services)
+- **Code Style:** Laravel Pint (PSR-12), standard Laravel conventions
 
-## Development Commands
+## Commands
 ```bash
-npm run setup    # Full project setup (composer, migrate, build)
-npm run dev      # Start dev server + queue worker + Vite HMR
-composer test    # Run PHPUnit tests
+docker-compose up -d                    # Start infrastructure
+docker-compose exec app php artisan migrate --seed  # Setup DB
+docker-compose exec app php artisan test            # Run tests
+docker-compose exec app php artisan call:simulate   # Demo calls
+npm run dev                             # Vite dev server
 ```
 
-## Architecture Conventions
-- Follow Laravel conventions: controllers in `app/Http/Controllers/`, models in `app/Models/`
-- Use Form Requests for validation
-- Use API Resources for JSON responses
-- Services in `app/Services/` for business logic
-- Repositories in `app/Repositories/` for complex queries
-- Actions in `app/Actions/` for single-purpose operations
-- Events/Listeners for async operations and Asterisk event handling
+## Architecture
+- Controllers in `app/Http/Controllers/` (Api/ for REST, Auth/ for web login)
+- Services in `app/Services/` (BillingService, CallSimulationService)
+- Events in `app/Events/` (ShouldBroadcast: CallStarted, CallUpdated, CallEnded, BalanceUpdated)
+- API Resources in `app/Http/Resources/`
+- Form Requests for validation
 - Follow standard Laravel code style (no declare(strict_types=1))
 - SOLID, DRY, KISS principles
+- Atomic transactions with lockForUpdate for billing
+- bcmath for money arithmetic
 
 ## Database
-- **Connection:** PostgreSQL on 127.0.0.1:5432, database `realtime_asterisk`
+- **PostgreSQL** on pgsql:5432, database `realtime_asterisk`
+- **Tables:** users, accounts, tariffs, cdrs, personal_access_tokens, sessions, cache, jobs
 - **Testing:** SQLite in-memory (phpunit.xml)
-- Asterisk Realtime tables follow Asterisk naming conventions (e.g., `ps_endpoints`, `ps_aors`, `ps_auths`)
-- Application tables use Laravel conventions (snake_case, plural)
+- CHECK constraints on balance, duration, cost, price fields (skipped on SQLite)
 
-## Key Patterns
-- Asterisk Realtime: PostgreSQL tables directly consumed by Asterisk via `res_config_pgsql`
-- Application manages these tables through Laravel Eloquent models
-- Real-time updates via WebSocket (planned: Laravel Reverb)
-- AMI/ARI integration for live call control (planned)
+## Broadcasting
+- Driver: pusher (pointed at Soketi)
+- Public channel: `calls` (call.started, call.updated, call.ended)
+- Private channel: `account.{id}` (balance.updated)
+- Auth: routes/channels.php
+
+## API (all under auth:sanctum except POST /api/login)
+- POST /api/login, GET /api/me, POST /api/logout
+- GET /api/account, GET /api/account/balance
+- GET /api/calls/active
+- GET /api/cdrs, GET /api/cdrs/{id}
