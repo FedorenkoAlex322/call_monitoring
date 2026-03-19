@@ -30,17 +30,21 @@ class CallEnded implements ShouldBroadcastNow
 
     public function broadcastWith(): array
     {
+        $this->cdr->load('account.user');
+
         return [
             'id' => $this->cdr->id,
             'uniqueid' => $this->cdr->uniqueid,
             'account_id' => $this->cdr->account_id,
-            'src' => $this->cdr->src,
             'dst' => $this->cdr->dst,
             'duration' => $this->cdr->duration,
             'billsec' => $this->cdr->billsec,
             'cost' => (float) $this->cdr->cost,
             'disposition' => $this->cdr->disposition,
+            'started_at' => $this->cdr->started_at->toISOString(),
             'ended_at' => $this->cdr->ended_at->toISOString(),
+            'account_number' => $this->cdr->account->number,
+            'user_name' => $this->cdr->account->user->name,
         ];
     }
 }
