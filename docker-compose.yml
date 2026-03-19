@@ -80,7 +80,7 @@ services:
       dockerfile: docker/app/Dockerfile
     container_name: realtime_asterisk_worker
     working_dir: /var/www/html
-    command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
+    command: php artisan queue:work redis --sleep=1 --tries=3 --max-time=3600
     volumes:
       - .:/var/www/html
     depends_on:

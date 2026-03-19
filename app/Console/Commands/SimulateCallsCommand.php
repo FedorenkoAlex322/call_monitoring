@@ -35,43 +35,59 @@ class SimulateCallsCommand extends Command
         $this->info("Starting simulation: {$accounts->count()} calls, max {$maxDuration}s, tick every {$interval}s");
         $this->newLine();
 
+        // Phase 1: Start all calls simultaneously
+        $activeCalls = [];
         foreach ($accounts as $account) {
             $account->load('tariff');
 
-            // Start call
             try {
                 $cdr = $service->startCall($account);
             } catch (DomainException $e) {
                 $this->warn("[SKIPPED] {$account->number}: {$e->getMessage()}");
                 continue;
             }
-            $this->info("[STARTED] {$cdr->src} -> {$cdr->dst} (uniqueid: {$cdr->uniqueid})");
 
-            // Duration ticks
-            $elapsed = 0;
-            while (true) {
-                sleep($interval);
-                $elapsed += $interval;
+            $minDuration = max($interval, (int) ceil($maxDuration / 3));
+            $targetDuration = rand($minDuration, $maxDuration);
 
-                $service->updateCall($cdr, $elapsed);
-                $this->line("  [UPDATE] {$cdr->src} duration: {$elapsed}s");
+            $activeCalls[] = [
+                'cdr' => $cdr,
+                'account' => $account,
+                'elapsed' => 0,
+                'target' => $targetDuration,
+            ];
 
-                if ($service->shouldEndCall($elapsed, $maxDuration)) {
-                    break;
+            $this->info("[STARTED] {$cdr->src} -> {$cdr->dst} (target: {$targetDuration}s)");
+        }
+
+        if (empty($activeCalls)) {
+            $this->error('No calls could be started.');
+            return self::FAILURE;
+        }
+
+        $this->newLine();
+
+        // Phase 2: Tick loop — update all active calls, end those that reached target
+        while (!empty($activeCalls)) {
+            sleep($interval);
+
+            $remaining = [];
+
+            foreach ($activeCalls as $call) {
+                $call['elapsed'] += $interval;
+                $service->updateCall($call['cdr'], $call['elapsed']);
+                $this->line("  [UPDATE] {$call['cdr']->src} duration: {$call['elapsed']}s / {$call['target']}s");
+
+                if ($call['elapsed'] >= $call['target']) {
+                    $cdr = $service->endCall($call['cdr']);
+                    $this->info("[ENDED]   {$cdr->src} -> {$cdr->dst} | duration: {$cdr->duration}s | cost: {$cdr->cost} | balance: {$call['account']->fresh()->balance}");
+                    $this->newLine();
+                } else {
+                    $remaining[] = $call;
                 }
             }
 
-            // End call
-            $cdr = $service->endCall($cdr);
-            $this->info("[ENDED]   {$cdr->src} -> {$cdr->dst} | duration: {$cdr->duration}s | cost: {$cdr->cost} | balance: {$account->fresh()->balance}");
-            $this->newLine();
-
-            // Random pause between calls
-            if ($account !== $accounts->last()) {
-                $pause = rand(1, 3);
-                $this->line("  Waiting {$pause}s before next call...");
-                sleep($pause);
-            }
+            $activeCalls = $remaining;
         }
 
         $this->info('Simulation completed.');
