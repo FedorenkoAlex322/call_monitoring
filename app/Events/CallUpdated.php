@@ -34,7 +34,6 @@ class CallUpdated implements ShouldBroadcastNow
             'id' => $this->cdr->id,
             'uniqueid' => $this->cdr->uniqueid,
             'duration' => $this->cdr->duration,
-            'status' => $this->cdr->status,
         ];
     }
 }

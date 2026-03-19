@@ -40,10 +40,12 @@
             <table x-show="activeCalls.length > 0" class="w-full">
                 <thead>
                     <tr class="border-b border-gray-700">
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Source</th>
+                        @if($isAdmin)
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Account</th>
+                        @endif
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Destination</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Duration</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Started At</th>
                     </tr>
                 </thead>
                 <tbody x-html="activeCallsHtml"></tbody>
@@ -62,11 +64,16 @@
             <table x-show="recentCdrs.length > 0" class="w-full">
                 <thead>
                     <tr class="border-b border-gray-700">
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Source</th>
+                        @if($isAdmin)
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Account</th>
+                        @endif
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Destination</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Duration</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Cost</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Disposition</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Started At</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Ended At</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Billsec</th>
                     </tr>
                 </thead>
                 <tbody x-html="recentCdrsHtml"></tbody>
@@ -87,15 +94,10 @@ function dashboard() {
         get activeCallsHtml() {
             return this.activeCalls.map(call => `
                 <tr class="border-b border-gray-700/50">
-                    <td class="px-4 py-3 text-sm text-white">${call.src}</td>
-                    <td class="px-4 py-3 text-sm text-gray-300">${call.dst}</td>
+                    ${this.isAdmin ? `<td class="px-4 py-3 text-sm text-gray-300">${call.account_number} — ${call.user_name}</td>` : ''}
+                    <td class="px-4 py-3 text-sm text-white">${call.dst}</td>
                     <td class="px-4 py-3 text-sm text-white font-mono">${this.formatDuration(call.duration)}</td>
-                    <td class="px-4 py-3">
-                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-400">
-                            <span class="w-1.5 h-1.5 rounded-full bg-green-400 mr-1.5 animate-pulse"></span>
-                            Active
-                        </span>
-                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-300">${this.formatTime(call.started_at)}</td>
                 </tr>
             `).join('');
         },
@@ -103,8 +105,8 @@ function dashboard() {
         get recentCdrsHtml() {
             return this.recentCdrs.map(cdr => `
                 <tr class="border-b border-gray-700/50">
-                    <td class="px-4 py-3 text-sm text-white">${cdr.src}</td>
-                    <td class="px-4 py-3 text-sm text-gray-300">${cdr.dst}</td>
+                    ${this.isAdmin ? `<td class="px-4 py-3 text-sm text-gray-300">${cdr.account_number} — ${cdr.user_name}</td>` : ''}
+                    <td class="px-4 py-3 text-sm text-white">${cdr.dst}</td>
                     <td class="px-4 py-3 text-sm text-white font-mono">${this.formatDuration(cdr.duration)}</td>
                     <td class="px-4 py-3 text-sm text-white font-mono">${parseFloat(cdr.cost).toFixed(2)} UAH</td>
                     <td class="px-4 py-3">
@@ -112,6 +114,9 @@ function dashboard() {
                             ${cdr.disposition}
                         </span>
                     </td>
+                    <td class="px-4 py-3 text-sm text-gray-300">${this.formatTime(cdr.started_at)}</td>
+                    <td class="px-4 py-3 text-sm text-gray-300">${this.formatTime(cdr.ended_at)}</td>
+                    <td class="px-4 py-3 text-sm text-white font-mono">${this.formatDuration(cdr.billsec)}</td>
                 </tr>
             `).join('');
         },
@@ -142,6 +147,12 @@ function dashboard() {
                 .listen('.balance.updated', (e) => {
                     this.balance = e.balance;
                 });
+        },
+
+        formatTime(isoString) {
+            if (!isoString) return '—';
+            const d = new Date(isoString);
+            return d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         },
 
         formatDuration(seconds) {

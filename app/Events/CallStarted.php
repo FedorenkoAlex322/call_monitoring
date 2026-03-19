@@ -30,15 +30,17 @@ class CallStarted implements ShouldBroadcastNow
 
     public function broadcastWith(): array
     {
+        $this->cdr->load('account.user');
+
         return [
             'id' => $this->cdr->id,
             'uniqueid' => $this->cdr->uniqueid,
             'account_id' => $this->cdr->account_id,
-            'src' => $this->cdr->src,
             'dst' => $this->cdr->dst,
-            'started_at' => $this->cdr->started_at->toISOString(),
             'duration' => 0,
-            'status' => 'active',
+            'started_at' => $this->cdr->started_at->toISOString(),
+            'account_number' => $this->cdr->account->number,
+            'user_name' => $this->cdr->account->user->name,
         ];
     }
 }

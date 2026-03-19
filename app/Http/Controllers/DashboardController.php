@@ -15,8 +15,8 @@ class DashboardController extends Controller
         $account = $user->account->load('tariff');
 
         if ($isAdmin) {
-            $activeCalls = Cdr::active()->orderBy('started_at', 'desc')->get();
-            $recentCdrs = Cdr::completed()->orderBy('ended_at', 'desc')->limit(20)->get();
+            $activeCalls = Cdr::with('account.user')->active()->orderBy('started_at', 'desc')->get();
+            $recentCdrs = Cdr::with('account.user')->completed()->orderBy('ended_at', 'desc')->limit(20)->get();
         } else {
             $activeCalls = $account->cdrs()->active()->orderBy('started_at', 'desc')->get();
             $recentCdrs = $account->cdrs()->completed()->orderBy('ended_at', 'desc')->limit(20)->get();
@@ -26,24 +26,30 @@ class DashboardController extends Controller
             'id' => $cdr->id,
             'uniqueid' => $cdr->uniqueid,
             'account_id' => $cdr->account_id,
-            'src' => $cdr->src,
             'dst' => $cdr->dst,
             'duration' => $cdr->duration,
             'started_at' => $cdr->started_at->toISOString(),
-            'status' => $cdr->status,
+            ...($isAdmin ? [
+                'account_number' => $cdr->account->number,
+                'user_name' => $cdr->account->user->name,
+            ] : []),
         ])->values();
 
         $recentCdrs = $recentCdrs->map(fn ($cdr) => [
             'id' => $cdr->id,
             'uniqueid' => $cdr->uniqueid,
             'account_id' => $cdr->account_id,
-            'src' => $cdr->src,
             'dst' => $cdr->dst,
             'duration' => $cdr->duration,
             'billsec' => $cdr->billsec,
             'cost' => (float) $cdr->cost,
             'disposition' => $cdr->disposition,
+            'started_at' => $cdr->started_at->toISOString(),
             'ended_at' => $cdr->ended_at?->toISOString(),
+            ...($isAdmin ? [
+                'account_number' => $cdr->account->number,
+                'user_name' => $cdr->account->user->name,
+            ] : []),
         ])->values();
 
         return view('dashboard', compact('account', 'activeCalls', 'recentCdrs', 'isAdmin'));
