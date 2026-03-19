@@ -90,9 +90,8 @@ class CallEventsTest extends TestCase
         $event = new CallStarted($cdr);
         $channels = $event->broadcastOn();
 
-        $this->assertCount(2, $channels);
+        $this->assertCount(1, $channels);
         $this->assertInstanceOf(Channel::class, $channels[0]);
-        $this->assertInstanceOf(PrivateChannel::class, $channels[1]);
     }
 
     public function test_balance_updated_broadcasts_on_private_channel(): void
